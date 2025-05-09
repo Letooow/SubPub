@@ -115,6 +115,7 @@ func TestClosing(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		err = sp.Close(context.Background())
+
 		assert.NoError(t, err)
 	})
 

@@ -1,13 +1,25 @@
 package api
 
-type Subscriber struct {
-	Cb      MessageHandler
-	Message chan any
+type subscriber struct {
+	cb      MessageHandler
+	message chan any
 }
 
-func NewSubscriber(cb MessageHandler) *Subscriber {
-	return &Subscriber{
-		Cb:      cb,
-		Message: make(chan any),
+func newSubscriber(cb MessageHandler) *subscriber {
+	sb := &subscriber{
+		cb:      cb,
+		message: make(chan any),
 	}
+	go func() {
+		for value := range sb.message {
+			done := make(chan struct{})
+			go func() {
+
+				sb.cb(value)
+				close(done)
+			}()
+			<-done
+		}
+	}()
+	return sb
 }
