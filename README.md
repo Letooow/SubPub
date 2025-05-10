@@ -31,6 +31,8 @@ subpub/
 └── README.md
 ```
 
+###  ___***Реализован Graceful Shutdown***___
+
 ## Конфигурация
 
 Сервер использует следующие переменные окружения:
@@ -82,3 +84,4 @@ grpcurl -plaintext -import-path proto -proto pubsub.proto \
   -d '{"key": "news"}' \
   localhost:8080 PubSub/Subscribe
 ```
+
