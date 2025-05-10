@@ -1,16 +1,84 @@
-# SubPub realisation
+# SubPub
 
-Сервис подписок на канал и публикаций сообщений:
+gRPC-сервис, реализующий паттерн публикации и подписки (Pub/Sub) с поддержкой потоковой передачи сообщений.
 
-1. Функция Subscribe возвращает подписку на канал публикаций.
-2. С помощью функции Unsubscribe можно отписаться от канала.
-3. Функция Publish делает публикацию в канал с именем "..." для всех подписчиков
+## Структура проекта
 
-### ***Реализован Graceful shutdown***
+```
+subpub/
+├── cmd/
+│   ├── config/
+│   │   └── congig.go
+│   └── server/
+│       ├── config.yaml
+│       └── main.go
+├── internal/
+│   ├── api/
+│   │   ├── api.go
+│   │   ├── api_test.go
+│   │   ├── subpub.go
+│   │   └── subscription.go
+│   └── gateways/
+│       ├── generated/
+│       │   ├── pubsub.pb.go
+│       │   └── pubsub_grpc.pb.go       
+│       ├── pubsub.proto
+│       ├── server.go
+│       └── pubsub.go
+├── proto/
+│   └── pubsub.proto
+├── go.mod
+└── README.md
+```
 
-Сервис учитывает переменные окружения ***HTTP_HOST*** и ***HTTP_PORT*** для создания сервера.
+## Конфигурация
 
-Команда для генерации gRPC файлов:
+Сервер использует следующие переменные окружения:
 
-___protoc  --go_out=./generated/ --go_opt=paths=source_relative --go-grpc_out=./generated/ --go-grpc_opt=paths=source_relative ./pubsub.proto___
+* `HTTP_HOST` — адрес прослушивания (по умолчанию `localhost`)
+* `HTTP_PORT` — порт прослушивания (по умолчанию `8080`)
 
+И ***.yaml*** конфиг:
+
+```yaml
+server:
+  host: "localhost"
+  port: 8080
+log:
+  level: "info"
+```
+
+## Запуск
+
+1. Генерация gRPC-кода:
+
+   ```bash
+   protoc --go_out=./internal/gateways/generated/ \
+          --go_opt=paths=source_relative \
+          --go-grpc_out=./internal/gateways/generated/ \
+          --go-grpc_opt=paths=source_relative \
+          ./proto/pubsub.proto
+   ```
+
+2. Запуск сервера:
+
+   ```bash
+   go run ./cmd/main.go
+   ```
+
+### Публикация сообщения
+
+```bash
+grpcurl -plaintext -import-path proto -proto pubsub.proto \
+  -d '{"key": "news", "data": "Новость"}' \
+  localhost:8080 PubSub/Publish
+```
+
+
+### Подписка на поток
+
+```bash
+grpcurl -plaintext -import-path proto -proto pubsub.proto \
+  -d '{"key": "news"}' \
+  localhost:8080 PubSub/Subscribe
+```
