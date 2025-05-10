@@ -2,11 +2,11 @@ package gateways
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"log"
 	subpub "subpub/internal/api"
 	gen "subpub/internal/gateways/generated"
 )
@@ -17,7 +17,8 @@ const (
 
 type PubSub struct {
 	gen.UnimplementedPubSubServer
-	sb subpub.SubPub
+	sb  subpub.SubPub
+	Log *logrus.Logger
 }
 
 func NewPubSub(sb subpub.SubPub) *PubSub {
@@ -38,11 +39,12 @@ func (pb *PubSub) Subscribe(subscribeRequest *gen.SubscribeRequest, g grpc.Serve
 	if err != nil {
 		return status.Errorf(codes.Internal, "subscribe error: %v", err)
 	}
-	log.Printf("new subscriber ID: %v to: %s\n", subscriber, subscribeRequest.Key)
+
+	pb.Log.Infof("new subscriber ID: %v to: %s\n", subscriber, subscribeRequest.Key)
 
 	go func() {
 		<-ctx.Done()
-		log.Println("subscribe cancelled from:", subscribeRequest.Key)
+		pb.Log.Infof("subscribe cancelled from: %s", subscribeRequest.Key)
 		close(msgChan)
 	}()
 
@@ -51,10 +53,10 @@ func (pb *PubSub) Subscribe(subscribeRequest *gen.SubscribeRequest, g grpc.Serve
 		for msg := range msgChan {
 			str, ok := msg.(string)
 			if !ok {
-				log.Println("wrong type")
+				pb.Log.Errorf("wrong type")
 				errChan <- status.Errorf(codes.Internal, ErrWrongTypeOfMessage)
 			}
-			log.Println("received message:", str, "from:", subscribeRequest.Key)
+			pb.Log.Infoln("received message:", str, "from:", subscribeRequest.Key)
 			if err := g.Send(&gen.Event{Data: str}); err != nil {
 				errChan <- status.Errorf(codes.Internal, "send error: %v", err)
 				return
@@ -76,10 +78,10 @@ func (pb *PubSub) Publish(ctx context.Context, publishRequest *gen.PublishReques
 	default:
 		err := pb.sb.Publish(publishRequest.Key, publishRequest.Data)
 		if err != nil {
-			log.Printf("publish error: %v with key: %s and data: %s\n", err, publishRequest.Key, publishRequest.Data)
+			pb.Log.Infof("publish error: %v with key: %s and data: %s\n", err, publishRequest.Key, publishRequest.Data)
 			return nil, status.Errorf(codes.NotFound, "publish error: %v", err)
 		}
-		log.Println("succeed publish to:", publishRequest.Key, "with data:", publishRequest.Data)
+		pb.Log.Infoln("succeed publish to:", publishRequest.Key, "with data:", publishRequest.Data)
 		return &emptypb.Empty{}, nil
 	}
 }
