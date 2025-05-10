@@ -2,6 +2,13 @@ package api
 
 import (
 	"context"
+	"errors"
+)
+
+var (
+	ErrNoSuchSubscription = errors.New("no such subscription")
+	ErrorNotInitSubPub    = errors.New("not init subPub")
+	ErrCallBackFuncIsNil  = errors.New("call back func is nil")
 )
 
 // MessageHandler is a callback function that processed messages delivered to subscribes

@@ -11,6 +11,10 @@ import (
 	gen "subpub/internal/gateways/generated"
 )
 
+const (
+	ErrWrongTypeOfMessage = "wrong message type"
+)
+
 type PubSub struct {
 	gen.UnimplementedPubSubServer
 	sb subpub.SubPub
@@ -48,6 +52,7 @@ func (pb *PubSub) Subscribe(subscribeRequest *gen.SubscribeRequest, g grpc.Serve
 			str, ok := msg.(string)
 			if !ok {
 				log.Println("wrong type")
+				errChan <- status.Errorf(codes.Internal, ErrWrongTypeOfMessage)
 			}
 			log.Println("received message:", str, "from:", subscribeRequest.Key)
 			if err := g.Send(&gen.Event{Data: str}); err != nil {

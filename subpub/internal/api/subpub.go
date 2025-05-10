@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"sync"
 )
 
@@ -20,10 +19,10 @@ func NewSubPub() SubPub {
 
 func (sb *SubPubRepo) Subscribe(subject string, cb MessageHandler) (Subscription, error) {
 	if cb == nil {
-		return nil, errors.New("cb is nil")
+		return nil, ErrCallBackFuncIsNil
 	}
 	if sb.subscriptions == nil {
-		return nil, errors.New("not init subPub")
+		return nil, ErrorNotInitSubPub
 	}
 
 	sb.mu.Lock()
@@ -40,14 +39,14 @@ func (sb *SubPubRepo) Subscribe(subject string, cb MessageHandler) (Subscription
 
 func (sb *SubPubRepo) Publish(subject string, msg any) error {
 	if sb.subscriptions == nil {
-		return errors.New("not init subPub")
+		return ErrorNotInitSubPub
 	}
 	if s, ok := sb.subscriptions[subject]; ok {
 		for _, v := range s {
 			v.message <- msg
 		}
 	} else {
-		return errors.New("no such subscription")
+		return ErrNoSuchSubscription
 	}
 	return nil
 }
