@@ -7,13 +7,13 @@ import (
 )
 
 type SubPubRepo struct {
-	subscriptions map[string]*SubscriptionRepo
+	subscriptions map[string]map[int64]*SubscriptionRepo
 	mu            *sync.Mutex
 }
 
 func NewSubPub() SubPub {
 	return &SubPubRepo{
-		subscriptions: make(map[string]*SubscriptionRepo),
+		subscriptions: make(map[string]map[int64]*SubscriptionRepo),
 		mu:            new(sync.Mutex),
 	}
 }
@@ -23,32 +23,28 @@ func (sb *SubPubRepo) Subscribe(subject string, cb MessageHandler) (Subscription
 		return nil, errors.New("cb is nil")
 	}
 	if sb.subscriptions == nil {
-		return nil, errors.New("not init subpub")
+		return nil, errors.New("not init subPub")
 	}
 
 	sb.mu.Lock()
+	sub := NewSubscription(sb, subject, cb)
 	if s, ok := sb.subscriptions[subject]; ok {
-		sub := newSubscriber(cb)
-		s.subscribers = append(s.subscribers, sub)
+		s[sub.ID] = sub
 	} else {
-		sub := newSubscriber(cb)
-		sb.subscriptions[subject] = &SubscriptionRepo{
-			subject:     subject,
-			subscribers: []*subscriber{sub},
-			subPub:      sb,
-		}
+		sb.subscriptions[subject] = make(map[int64]*SubscriptionRepo)
+		sb.subscriptions[subject][sub.ID] = sub
 	}
 	sb.mu.Unlock()
-	return sb.subscriptions[subject], nil
+	return sb.subscriptions[subject][sub.ID], nil
 }
 
 func (sb *SubPubRepo) Publish(subject string, msg any) error {
 	if sb.subscriptions == nil {
-		return errors.New("not init subpub")
+		return errors.New("not init subPub")
 	}
 	if s, ok := sb.subscriptions[subject]; ok {
-		for i := range len(s.subscribers) {
-			s.subscribers[i].message <- msg
+		for _, v := range s {
+			v.message <- msg
 		}
 	} else {
 		return errors.New("no such subscription")
@@ -62,7 +58,9 @@ func (sb *SubPubRepo) Close(ctx context.Context) error {
 		return ctx.Err()
 	default:
 		for _, s := range sb.subscriptions {
-			s.Unsubscribe()
+			for _, sub := range s {
+				sub.Unsubscribe()
+			}
 		}
 		sb.mu.Lock()
 		sb.subscriptions = nil

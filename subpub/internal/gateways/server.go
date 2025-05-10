@@ -65,8 +65,14 @@ func (s *Server) Run(ctx context.Context) error {
 		<-ctx.Done()
 		log.Println("shutting down server...")
 		select {
-		case <-time.After(2 * time.Second):
-			s.server.GracefulStop()
+		case <-time.After(5 * time.Second):
+			err := s.pubSub.sb.Close(context.Background())
+			if err != nil {
+				log.Printf("close pubSub connection error: %v", err)
+				return
+			}
+			s.server.Stop()
+			log.Println("server shutdown gracefully")
 		}
 	}()
 

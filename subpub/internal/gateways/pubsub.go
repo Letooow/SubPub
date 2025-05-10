@@ -5,7 +5,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	subpub "subpub/internal/api"
 	gen "subpub/internal/gateways/generated"
@@ -22,18 +22,26 @@ func NewPubSub(sb subpub.SubPub) *PubSub {
 
 func (pb *PubSub) Subscribe(subscribeRequest *gen.SubscribeRequest, g grpc.ServerStreamingServer[gen.Event]) error {
 	msgChan := make(chan any)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(g.Context())
 	defer cancel()
-	_, err := pb.sb.Subscribe(subscribeRequest.Key, func(msg any) {
+	subscriber, err := pb.sb.Subscribe(subscribeRequest.Key, func(msg any) {
 		select {
 		case msgChan <- msg:
 		case <-ctx.Done():
 		}
 	})
+
 	if err != nil {
 		return status.Errorf(codes.Internal, "subscribe error: %v", err)
 	}
-	log.Println("new subscriber to: ", subscribeRequest.Key)
+	log.Printf("new subscriber ID: %v to: %s\n", subscriber, subscribeRequest.Key)
+
+	go func() {
+		<-ctx.Done()
+		log.Println("subscribe cancelled from:", subscribeRequest.Key)
+		close(msgChan)
+	}()
+
 	errChan := make(chan error)
 	go func() {
 		for msg := range msgChan {
@@ -49,7 +57,11 @@ func (pb *PubSub) Subscribe(subscribeRequest *gen.SubscribeRequest, g grpc.Serve
 		}
 		errChan <- nil
 	}()
-	return <-errChan
+	err = <-errChan
+	if err != nil {
+		return status.Errorf(codes.Internal, "subscribe error: %v", err)
+	}
+	return nil
 }
 
 func (pb *PubSub) Publish(ctx context.Context, publishRequest *gen.PublishRequest) (*emptypb.Empty, error) {
@@ -65,9 +77,4 @@ func (pb *PubSub) Publish(ctx context.Context, publishRequest *gen.PublishReques
 		log.Println("succeed publish to:", publishRequest.Key, "with data:", publishRequest.Data)
 		return &emptypb.Empty{}, nil
 	}
-}
-
-func (pb *PubSub) mustEmbedUnimplementedPubSubServer() {
-	//TODO implement me
-	panic("implement me")
 }

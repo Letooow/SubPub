@@ -108,6 +108,33 @@ func TestClosing(t *testing.T) {
 		assert.Error(t, err, "should return error")
 	})
 
+	t.Run("ok two unsubscribe", func(t *testing.T) {
+		sp := NewSubPub()
+		array := make([]int, 0)
+		mu := new(sync.Mutex)
+		s, err := sp.Subscribe("1", func(msg any) {
+			mu.Lock()
+			array = append(array, msg.(int))
+			mu.Unlock()
+		})
+		assert.NoError(t, err)
+		r, err := sp.Subscribe("1", func(msg any) {
+			mu.Lock()
+			array = append(array, msg.(int))
+			mu.Unlock()
+		})
+		assert.NoError(t, err)
+		s.Unsubscribe()
+		time.Sleep(1 * time.Second)
+		err = sp.Publish("1", 1)
+		assert.NoError(t, err)
+		r.Unsubscribe()
+		time.Sleep(1 * time.Second)
+		err = sp.Publish("1", 2)
+		assert.Error(t, err)
+		assert.Equal(t, []int{1}, array)
+	})
+
 	t.Run("ok close", func(t *testing.T) {
 		sp := NewSubPub()
 		_, err := sp.Subscribe("1", func(msg any) {
