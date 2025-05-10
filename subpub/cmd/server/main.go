@@ -22,7 +22,7 @@ func main() {
 	var host string
 	var port int
 
-	cfg, err := config.Load("cmd/server/config.yaml")
+	cfg, err := config.Load("cmd/config/config.yaml")
 	if err != nil {
 		fmt.Printf("error while parsing config %v", err)
 		os.Exit(1)
